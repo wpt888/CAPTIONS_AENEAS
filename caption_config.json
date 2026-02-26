@@ -1,0 +1,17 @@
+{
+  "words_per_caption": 2,
+  "min_duration": 0.7,
+  "max_duration": 3.0,
+  "model_name": "large",
+  "output_formats": {
+    "SRT": true,
+    "VTT": false,
+    "JSON": false,
+    "CSV": false
+  },
+  "remove_punctuation": false,
+  "text_case": "normal",
+  "output_folder": "C:/Users/ukfdb/Downloads",
+  "audio_file": "C:/Users/ukfdb/Downloads/ElevenLabs_2026-02-26T09_19_46_Ana Maria _pvc_sp114_s57_sb75_se22_b_m2.mp3",
+  "original_text": "Cauți pantofi de protecție care chiar fac diferența?\nDescoperă modelul Ardon Digger creat pentru siguranță și confort.\nAre bombeu din compozit care absoarbe impactul.\nLamelă din Kevlar care oprește obiectele ascuțite.\nMaterial flexibil din microfibră pentru mișcare naturală.\nTalpă rezistentă cu aderență excelentă și amortizare sigură.\nFără elemente metalice.\nÎi găsești pe nortia.ro."
+}

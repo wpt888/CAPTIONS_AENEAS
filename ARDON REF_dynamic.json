@@ -1,0 +1,813 @@
+{
+  "metadata": {
+    "generator": "DynamicCaptionsGenerator",
+    "settings": {
+      "max_words_per_caption": 2,
+      "min_duration": 0.7,
+      "max_duration": 3.0,
+      "total_words": 61,
+      "total_captions": 31
+    },
+    "generated_at": "1758616485.1249702"
+  },
+  "segments": [
+    {
+      "id": 1,
+      "text": "Vrei să",
+      "start": 0.0,
+      "end": 0.25,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "Vrei",
+          "start": 0.0,
+          "end": 0.14,
+          "confidence": 0.506,
+          "original_text": "Vrei",
+          "was_corrected": false
+        },
+        {
+          "text": "să",
+          "start": 0.14,
+          "end": 0.26,
+          "confidence": 0.78,
+          "original_text": "să",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.25
+    },
+    {
+      "id": 2,
+      "text": "fii vizibil",
+      "start": 0.26,
+      "end": 0.71,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "fii",
+          "start": 0.26,
+          "end": 0.42,
+          "confidence": 0.545,
+          "original_text": "fii",
+          "was_corrected": false
+        },
+        {
+          "text": "vizibil",
+          "start": 0.42,
+          "end": 0.72,
+          "confidence": 0.734,
+          "original_text": "visibil",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.44999999999999996
+    },
+    {
+      "id": 3,
+      "text": "la locul",
+      "start": 0.72,
+      "end": 1.15,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "la",
+          "start": 0.72,
+          "end": 0.9,
+          "confidence": 0.99,
+          "original_text": "la",
+          "was_corrected": false
+        },
+        {
+          "text": "locul",
+          "start": 0.9,
+          "end": 1.16,
+          "confidence": 0.951,
+          "original_text": "locul",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.42999999999999994
+    },
+    {
+      "id": 4,
+      "text": "de muncă?",
+      "start": 1.16,
+      "end": 1.71,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "de",
+          "start": 1.16,
+          "end": 1.26,
+          "confidence": 0.847,
+          "original_text": "de",
+          "was_corrected": false
+        },
+        {
+          "text": "muncă?",
+          "start": 1.26,
+          "end": 1.58,
+          "confidence": 0.762,
+          "original_text": "muncă",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.55
+    },
+    {
+      "id": 5,
+      "text": "Brățara Ardon",
+      "start": 1.72,
+      "end": 2.39,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "Brățara",
+          "start": 1.72,
+          "end": 2.08,
+          "confidence": 0.629,
+          "original_text": "Brățarea",
+          "was_corrected": true
+        },
+        {
+          "text": "Ardon",
+          "start": 2.08,
+          "end": 2.4,
+          "confidence": 0.571,
+          "original_text": "Ardon",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.6700000000000002
+    },
+    {
+      "id": 6,
+      "text": "REF rezolvă",
+      "start": 2.4,
+      "end": 3.0900000000000003,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "REF",
+          "start": 2.4,
+          "end": 2.64,
+          "confidence": 0.425,
+          "original_text": "ref",
+          "was_corrected": true
+        },
+        {
+          "text": "rezolvă",
+          "start": 2.64,
+          "end": 3.1,
+          "confidence": 0.817,
+          "original_text": "rezolva",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.6900000000000004
+    },
+    {
+      "id": 7,
+      "text": "această problemă.",
+      "start": 3.1,
+      "end": 3.7300000000000004,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "această",
+          "start": 3.1,
+          "end": 3.38,
+          "confidence": 0.644,
+          "original_text": "aceasta",
+          "was_corrected": true
+        },
+        {
+          "text": "problemă.",
+          "start": 3.38,
+          "end": 3.74,
+          "confidence": 0.793,
+          "original_text": "problemă",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.6300000000000003
+    },
+    {
+      "id": 8,
+      "text": "Este mulabilă",
+      "start": 3.74,
+      "end": 4.470000000000001,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "Este",
+          "start": 3.74,
+          "end": 3.98,
+          "confidence": 0.869,
+          "original_text": "Este",
+          "was_corrected": false
+        },
+        {
+          "text": "mulabilă",
+          "start": 3.98,
+          "end": 4.48,
+          "confidence": 0.541,
+          "original_text": "mulabilă",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.7300000000000004
+    },
+    {
+      "id": 9,
+      "text": "și poate",
+      "start": 4.48,
+      "end": 4.7700000000000005,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "și",
+          "start": 4.48,
+          "end": 4.54,
+          "confidence": 0.798,
+          "original_text": "și",
+          "was_corrected": false
+        },
+        {
+          "text": "poate",
+          "start": 4.54,
+          "end": 4.78,
+          "confidence": 0.85,
+          "original_text": "poate",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.29000000000000004
+    },
+    {
+      "id": 10,
+      "text": "fi pusă",
+      "start": 4.78,
+      "end": 5.13,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "fi",
+          "start": 4.78,
+          "end": 4.88,
+          "confidence": 0.695,
+          "original_text": "fi",
+          "was_corrected": false
+        },
+        {
+          "text": "pusă",
+          "start": 4.88,
+          "end": 5.14,
+          "confidence": 0.755,
+          "original_text": "pusă",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.34999999999999964
+    },
+    {
+      "id": 11,
+      "text": "pe mână",
+      "start": 5.14,
+      "end": 5.45,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "pe",
+          "start": 5.14,
+          "end": 5.24,
+          "confidence": 0.83,
+          "original_text": "pe",
+          "was_corrected": false
+        },
+        {
+          "text": "mână",
+          "start": 5.24,
+          "end": 5.46,
+          "confidence": 0.666,
+          "original_text": "mână",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.3100000000000005
+    },
+    {
+      "id": 12,
+      "text": "sau pe",
+      "start": 5.46,
+      "end": 5.69,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "sau",
+          "start": 5.46,
+          "end": 5.56,
+          "confidence": 0.898,
+          "original_text": "sau",
+          "was_corrected": false
+        },
+        {
+          "text": "pe",
+          "start": 5.56,
+          "end": 5.7,
+          "confidence": 0.996,
+          "original_text": "pe",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.23000000000000043
+    },
+    {
+      "id": 13,
+      "text": "picior. Se",
+      "start": 5.7,
+      "end": 6.19,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "picior.",
+          "start": 5.7,
+          "end": 6.02,
+          "confidence": 0.607,
+          "original_text": "picior",
+          "was_corrected": true
+        },
+        {
+          "text": "Se",
+          "start": 6.1,
+          "end": 6.2,
+          "confidence": 0.587,
+          "original_text": "Se",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.4900000000000002
+    },
+    {
+      "id": 14,
+      "text": "aplică și",
+      "start": 6.2,
+      "end": 6.61,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "aplică",
+          "start": 6.2,
+          "end": 6.5,
+          "confidence": 0.621,
+          "original_text": "aplica",
+          "was_corrected": true
+        },
+        {
+          "text": "și",
+          "start": 6.5,
+          "end": 6.62,
+          "confidence": 0.951,
+          "original_text": "și",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.41000000000000014
+    },
+    {
+      "id": 15,
+      "text": "înlătură ușor,",
+      "start": 6.62,
+      "end": 7.42,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "înlătură",
+          "start": 6.62,
+          "end": 7.12,
+          "confidence": 0.625,
+          "original_text": "senlatură",
+          "was_corrected": true
+        },
+        {
+          "text": "ușor,",
+          "start": 7.12,
+          "end": 7.43,
+          "confidence": 0.807,
+          "original_text": "ușor",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.7999999999999998
+    },
+    {
+      "id": 16,
+      "text": "oferindu-ți flexibilitate",
+      "start": 7.43,
+      "end": 8.77,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "oferindu-ți",
+          "start": 7.43,
+          "end": 8.08,
+          "confidence": 0.812,
+          "original_text": "oferinduți",
+          "was_corrected": true
+        },
+        {
+          "text": "flexibilitate",
+          "start": 8.08,
+          "end": 8.78,
+          "confidence": 0.975,
+          "original_text": "flexibilitate",
+          "was_corrected": false
+        }
+      ],
+      "duration": 1.3399999999999999
+    },
+    {
+      "id": 17,
+      "text": "totală. Realizată",
+      "start": 8.78,
+      "end": 9.77,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "totală.",
+          "start": 8.78,
+          "end": 9.15,
+          "confidence": 0.658,
+          "original_text": "totală",
+          "was_corrected": true
+        },
+        {
+          "text": "Realizată",
+          "start": 9.15,
+          "end": 9.78,
+          "confidence": 0.823,
+          "original_text": "Realizată",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.9900000000000002
+    },
+    {
+      "id": 18,
+      "text": "din folie",
+      "start": 9.78,
+      "end": 10.17,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "din",
+          "start": 9.78,
+          "end": 9.88,
+          "confidence": 0.839,
+          "original_text": "din",
+          "was_corrected": false
+        },
+        {
+          "text": "folie",
+          "start": 9.88,
+          "end": 10.18,
+          "confidence": 0.932,
+          "original_text": "folie",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.39000000000000057
+    },
+    {
+      "id": 19,
+      "text": "reflectorizantă PVC,",
+      "start": 10.18,
+      "end": 11.48,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "reflectorizantă",
+          "start": 10.18,
+          "end": 11.0,
+          "confidence": 0.727,
+          "original_text": "reflectorizantă",
+          "was_corrected": false
+        },
+        {
+          "text": "PVC,",
+          "start": 11.0,
+          "end": 11.49,
+          "confidence": 0.281,
+          "original_text": "pvc",
+          "was_corrected": true
+        }
+      ],
+      "duration": 1.3000000000000007
+    },
+    {
+      "id": 20,
+      "text": "cu bandă",
+      "start": 11.49,
+      "end": 11.99,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "cu",
+          "start": 11.49,
+          "end": 11.74,
+          "confidence": 0.892,
+          "original_text": "cu",
+          "was_corrected": false
+        },
+        {
+          "text": "bandă",
+          "start": 11.74,
+          "end": 12.0,
+          "confidence": 0.775,
+          "original_text": "bandă",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.5
+    },
+    {
+      "id": 21,
+      "text": "metalică și",
+      "start": 12.0,
+      "end": 12.55,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "metalică",
+          "start": 12.0,
+          "end": 12.42,
+          "confidence": 0.308,
+          "original_text": "metalica",
+          "was_corrected": true
+        },
+        {
+          "text": "și",
+          "start": 12.42,
+          "end": 12.56,
+          "confidence": 0.98,
+          "original_text": "și",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.5500000000000007
+    },
+    {
+      "id": 22,
+      "text": "folie gri,",
+      "start": 12.56,
+      "end": 13.05,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "folie",
+          "start": 12.56,
+          "end": 12.84,
+          "confidence": 0.994,
+          "original_text": "folie",
+          "was_corrected": false
+        },
+        {
+          "text": "gri,",
+          "start": 12.84,
+          "end": 13.02,
+          "confidence": 0.707,
+          "original_text": "grii",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.4900000000000002
+    },
+    {
+      "id": 23,
+      "text": "Brățara sau",
+      "start": 13.06,
+      "end": 13.53,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "Brățara",
+          "start": 13.06,
+          "end": 13.42,
+          "confidence": 0.833,
+          "original_text": "Brățarea",
+          "was_corrected": true
+        },
+        {
+          "text": "sau",
+          "start": 13.42,
+          "end": 13.54,
+          "confidence": 0.391,
+          "original_text": "au",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.46999999999999886
+    },
+    {
+      "id": 24,
+      "text": "oferă vizibilitate",
+      "start": 13.54,
+      "end": 14.25,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "oferă",
+          "start": 13.54,
+          "end": 13.74,
+          "confidence": 0.641,
+          "original_text": "feră",
+          "was_corrected": true
+        },
+        {
+          "text": "vizibilitate",
+          "start": 13.74,
+          "end": 14.26,
+          "confidence": 0.97,
+          "original_text": "visibilitate",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.7100000000000009
+    },
+    {
+      "id": 25,
+      "text": "ridicată. Ogasă",
+      "start": 14.26,
+      "end": 15.17,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "ridicată.",
+          "start": 14.26,
+          "end": 14.82,
+          "confidence": 0.814,
+          "original_text": "ridicată",
+          "was_corrected": true
+        },
+        {
+          "text": "Ogasă",
+          "start": 14.86,
+          "end": 15.18,
+          "confidence": 0.392,
+          "original_text": "Ogasă",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.9100000000000001
+    },
+    {
+      "id": 26,
+      "text": "și penortei",
+      "start": 15.18,
+      "end": 15.65,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "și",
+          "start": 15.18,
+          "end": 15.26,
+          "confidence": 0.302,
+          "original_text": "și",
+          "was_corrected": false
+        },
+        {
+          "text": "penortei",
+          "start": 15.26,
+          "end": 15.66,
+          "confidence": 0.349,
+          "original_text": "penortei",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.47000000000000064
+    },
+    {
+      "id": 27,
+      "text": "a punkterom",
+      "start": 15.66,
+      "end": 16.169999999999998,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "a",
+          "start": 15.66,
+          "end": 15.72,
+          "confidence": 0.67,
+          "original_text": "a",
+          "was_corrected": false
+        },
+        {
+          "text": "punkterom",
+          "start": 15.72,
+          "end": 16.18,
+          "confidence": 0.379,
+          "original_text": "punkterom",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.509999999999998
+    },
+    {
+      "id": 28,
+      "text": "și costă",
+      "start": 16.18,
+      "end": 16.63,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "și",
+          "start": 16.18,
+          "end": 16.34,
+          "confidence": 0.513,
+          "original_text": "și",
+          "was_corrected": false
+        },
+        {
+          "text": "costă",
+          "start": 16.34,
+          "end": 16.64,
+          "confidence": 0.648,
+          "original_text": "costa",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.4499999999999993
+    },
+    {
+      "id": 29,
+      "text": "doar 7.99",
+      "start": 16.64,
+      "end": 17.709999999999997,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "doar",
+          "start": 16.64,
+          "end": 16.82,
+          "confidence": 0.778,
+          "original_text": "doar",
+          "was_corrected": false
+        },
+        {
+          "text": "7.99",
+          "start": 16.82,
+          "end": 17.72,
+          "confidence": 0.736,
+          "original_text": "790",
+          "was_corrected": true
+        }
+      ],
+      "duration": 1.0699999999999967
+    },
+    {
+      "id": 30,
+      "text": "și 9",
+      "start": 17.72,
+      "end": 18.169999999999998,
+      "word_count": 2,
+      "words": [
+        {
+          "text": "și",
+          "start": 17.72,
+          "end": 18.02,
+          "confidence": 0.708,
+          "original_text": "și",
+          "was_corrected": false
+        },
+        {
+          "text": "9",
+          "start": 18.02,
+          "end": 18.18,
+          "confidence": 0.529,
+          "original_text": "9",
+          "was_corrected": false
+        }
+      ],
+      "duration": 0.4499999999999993
+    },
+    {
+      "id": 31,
+      "text": "lei.",
+      "start": 18.18,
+      "end": 18.88,
+      "word_count": 1,
+      "words": [
+        {
+          "text": "lei.",
+          "start": 18.18,
+          "end": 18.4,
+          "confidence": 0.384,
+          "original_text": "lei",
+          "was_corrected": true
+        }
+      ],
+      "duration": 0.6999999999999993
+    }
+  ]
+}
