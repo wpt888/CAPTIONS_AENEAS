@@ -42,10 +42,10 @@ try:
     from text_correction import correct_transcription, calculate_correction_stats, TextCorrector
 except ImportError as e:
     print(f"❌ Eroare la importul bibliotecilor: {e}")
-    print("Rulează: pip install whisper-timestamped pydub")
+    print("Rulează Start_CaptionsUI.bat pentru configurarea automată a mediului.")
     if 'text_correction' in str(e):
         print("❗ Modulul text_correction.py lipsește din director")
-    exit(1)
+    raise SystemExit(1)
 
 
 class DynamicCaptionsGenerator:
