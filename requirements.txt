@@ -1,3 +1,4 @@
 whisper-timestamped==1.15.9
 pydub==0.25.1
 tkinterdnd2==0.6.2
+keyring>=25.0

@@ -12,11 +12,26 @@ import tkinter.font as tkfont
 import os
 import threading
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
 from datetime import datetime
 from caption_preview import CaptionPreviewWindow
+from elevenlabs_tts import (
+    ElevenLabsClient,
+    ElevenLabsError,
+    alignment_to_words,
+    create_caption_segments,
+    safe_file_stem,
+)
+
+SCRIPT_PLACEHOLDER = "Scrie sau lipește aici textul pentru voce..."
+
+try:
+    import keyring
+except ImportError:
+    keyring = None
 
 # Setez FFmpeg în PATH dacă există
 def setup_ffmpeg_path():
@@ -58,7 +73,7 @@ except ImportError:
         messagebox.showerror("Eroare", "Nu pot importa dynamic_captions.py!\nAsigură-te că fișierul există în același director.")
         root.destroy()
     except:
-        print("❌ Nu pot importa dynamic_captions.py!")
+        print("EROARE: Nu pot importa dynamic_captions.py!")
     sys.exit(1)
 
 
@@ -101,20 +116,36 @@ class CaptionUI:
         # Opțiuni pentru formatarea textului
         self.remove_punctuation = tk.BooleanVar(value=False)
         self.text_case = tk.StringVar(value="normal")
+
+        # ElevenLabs: cheia nu este salvată niciodată în fișierul JSON.
+        self.elevenlabs_api_key = tk.StringVar(value=os.environ.get("ELEVENLABS_API_KEY", ""))
+        self.elevenlabs_voice = tk.StringVar()
+        self.elevenlabs_voice_id = tk.StringVar()
+        self.elevenlabs_model = tk.StringVar(value="eleven_multilingual_v2")
+        self.elevenlabs_stability = tk.DoubleVar(value=0.57)
+        self.elevenlabs_similarity = tk.DoubleVar(value=0.75)
+        self.elevenlabs_style = tk.DoubleVar(value=0.22)
+        self.elevenlabs_speed = tk.DoubleVar(value=1.0)
+        self.elevenlabs_speaker_boost = tk.BooleanVar(value=True)
+        self.voice_ids = {}
         
         self.generator = None
         self.is_processing = False
         self.last_generated_captions = None
         self.last_original_text = None
+        self.last_audio_path = None
+        self.playback_process = None
 
         # Config file pentru salvarea setărilor
         self.config_file = Path("caption_config.json")
 
-        self.load_config()
+        self._load_saved_api_key()
         self.create_ui()
+        self.load_config()
 
         # Salvează config la schimbarea setărilor
         self.setup_config_auto_save()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         
     def setup_theme(self):
         """Configurez tema modernă"""
@@ -166,14 +197,17 @@ class CaptionUI:
         right_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
         right_frame.columnconfigure(0, weight=1)
 
+        # Generare directă prin ElevenLabs
+        self.create_elevenlabs_section(right_frame, 0)
+
         # Settings Section
-        self.create_settings_section(right_frame, 0)
+        self.create_settings_section(right_frame, 1)
 
         # Output Formats Section
-        self.create_formats_section(right_frame, 1)
+        self.create_formats_section(right_frame, 2)
 
         # Output Folder Section
-        self.create_output_folder_section(right_frame, 2)
+        self.create_output_folder_section(right_frame, 3)
 
         # Action Buttons - span across both columns
         self.create_buttons_section(main_frame, 2)
@@ -191,7 +225,7 @@ class CaptionUI:
             left_frame.rowconfigure(i, weight=0)
         left_frame.rowconfigure(1, weight=1)  # Text section expandable
 
-        for i in range(4):
+        for i in range(5):
             right_frame.rowconfigure(i, weight=0)
         
     def create_file_section(self, parent, row):
@@ -236,14 +270,14 @@ class CaptionUI:
         
     def create_original_text_section(self, parent, row):
         """Secțiunea pentru textul original din ElevenLabs"""
-        frame = ttk.LabelFrame(parent, text="📝 Text Original ElevenLabs (pentru corectare automată)",
+        frame = ttk.LabelFrame(parent, text="📝 Text / Script",
                              padding=15, style='Card.TFrame')
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
         frame.columnconfigure(0, weight=1)
 
         # Info label
         info_label = ttk.Label(frame,
-                             text="💡 Inserează aici textul original folosit în ElevenLabs pentru corectarea automată a cuvintelor",
+                             text="💡 Este folosit direct la generarea vocii sau pentru corectarea unui audio extern",
                              style='Info.TLabel')
         info_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
 
@@ -263,7 +297,7 @@ class CaptionUI:
         self.original_text_widget.grid(row=0, column=0, sticky="ew")
 
         # Placeholder text
-        placeholder_text = "Paste aici textul pe care l-ai folosit în ElevenLabs..."
+        placeholder_text = SCRIPT_PLACEHOLDER
         self.original_text_widget.insert('1.0', placeholder_text)
         self.original_text_widget.config(fg='#95a5a6')
 
@@ -323,7 +357,7 @@ class CaptionUI:
             if text:
                 # Clear placeholder
                 current_text = self.original_text_widget.get('1.0', tk.END).strip()
-                if current_text == "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+                if current_text == SCRIPT_PLACEHOLDER:
                     self.original_text_widget.delete('1.0', tk.END)
                     self.original_text_widget.config(fg='#2c3e50')
                 else:
@@ -340,7 +374,7 @@ class CaptionUI:
     def clear_original_text(self):
         """Curăță textul original"""
         self.original_text_widget.delete('1.0', tk.END)
-        self.original_text_widget.insert('1.0', "Paste aici textul pe care l-ai folosit în ElevenLabs...")
+        self.original_text_widget.insert('1.0', SCRIPT_PLACEHOLDER)
         self.original_text_widget.config(fg='#95a5a6')
         self.text_stats_label.config(text="0 cuvinte • 0 caractere")
         self.save_config()  # Salvează automat
@@ -362,7 +396,7 @@ class CaptionUI:
 
                 # Clear placeholder
                 current_text = self.original_text_widget.get('1.0', tk.END).strip()
-                if current_text == "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+                if current_text == SCRIPT_PLACEHOLDER:
                     self.original_text_widget.delete('1.0', tk.END)
                     self.original_text_widget.config(fg='#2c3e50')
 
@@ -376,10 +410,159 @@ class CaptionUI:
     def update_text_stats(self, event=None):
         """Actualizează statisticile textului"""
         text = self.original_text_widget.get('1.0', tk.END).strip()
-        if text != "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+        if text != SCRIPT_PLACEHOLDER:
             words = len(text.split())
             chars = len(text)
             self.text_stats_label.config(text=f"{words} cuvinte • {chars} caractere")
+
+    def _load_saved_api_key(self):
+        """Încarcă cheia din Windows Credential Manager, dacă există."""
+        if self.elevenlabs_api_key.get() or keyring is None:
+            return
+        try:
+            saved_key = keyring.get_password("CAPTIONS_AENEAS", "elevenlabs_api_key")
+            if saved_key:
+                self.elevenlabs_api_key.set(saved_key)
+        except Exception as error:
+            print(f"AVERTISMENT: Nu pot citi cheia ElevenLabs din Credential Manager: {error}")
+
+    def save_elevenlabs_api_key(self):
+        """Salvează cheia în credential store-ul sistemului, nu în proiect."""
+        api_key = self.elevenlabs_api_key.get().strip()
+        if not api_key:
+            messagebox.showerror("ElevenLabs", "Introdu mai întâi cheia API.")
+            return
+        if keyring is None:
+            messagebox.showerror(
+                "ElevenLabs",
+                "Biblioteca keyring lipsește. Rulează din nou Start_CaptionsUI.bat.",
+            )
+            return
+        try:
+            keyring.set_password("CAPTIONS_AENEAS", "elevenlabs_api_key", api_key)
+            self.log_message("🔐 Cheia ElevenLabs a fost salvată securizat în Windows.")
+            messagebox.showinfo("ElevenLabs", "Cheia API a fost salvată în Windows Credential Manager.")
+        except Exception as error:
+            messagebox.showerror("ElevenLabs", f"Nu pot salva cheia în Windows:\n{error}")
+
+    def create_elevenlabs_section(self, parent, row):
+        """Controale pentru generarea directă MP3 + SRT prin ElevenLabs."""
+        frame = ttk.LabelFrame(
+            parent,
+            text="🎙️ ElevenLabs — MP3 + SRT instant",
+            padding=15,
+            style='Card.TFrame',
+        )
+        frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
+        frame.columnconfigure(1, weight=1)
+
+        ttk.Label(frame, text="Cheie API:", style='Subtitle.TLabel').grid(
+            row=0, column=0, sticky="w", pady=4
+        )
+        ttk.Entry(frame, textvariable=self.elevenlabs_api_key, show="•").grid(
+            row=0, column=1, sticky="ew", padx=6, pady=4
+        )
+        ttk.Button(frame, text="Salvează sigur", command=self.save_elevenlabs_api_key).grid(
+            row=0, column=2, sticky="e", pady=4
+        )
+
+        ttk.Label(frame, text="Voce:", style='Subtitle.TLabel').grid(
+            row=1, column=0, sticky="w", pady=4
+        )
+        self.voice_combo = ttk.Combobox(
+            frame, textvariable=self.elevenlabs_voice, state="readonly"
+        )
+        self.voice_combo.grid(row=1, column=1, sticky="ew", padx=6, pady=4)
+        self.voice_combo.bind("<<ComboboxSelected>>", self._on_voice_selected)
+        self.load_voices_btn = ttk.Button(frame, text="Încarcă vocile", command=self.load_elevenlabs_voices)
+        self.load_voices_btn.grid(row=1, column=2, sticky="e", pady=4)
+
+        ttk.Label(frame, text="Model:", style='Subtitle.TLabel').grid(
+            row=2, column=0, sticky="w", pady=4
+        )
+        ttk.Combobox(
+            frame,
+            textvariable=self.elevenlabs_model,
+            values=["eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_v3"],
+            state="readonly",
+        ).grid(row=2, column=1, sticky="ew", padx=6, pady=4)
+
+        tuning = ttk.Frame(frame)
+        tuning.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        for column in range(4):
+            tuning.columnconfigure(column, weight=1)
+        controls = [
+            ("Stability", self.elevenlabs_stability, 0.0, 1.0, 0.01),
+            ("Similarity", self.elevenlabs_similarity, 0.0, 1.0, 0.01),
+            ("Style", self.elevenlabs_style, 0.0, 1.0, 0.01),
+            ("Speed", self.elevenlabs_speed, 0.7, 1.2, 0.01),
+        ]
+        for column, (label, variable, minimum, maximum, increment) in enumerate(controls):
+            ttk.Label(tuning, text=label).grid(row=0, column=column, sticky="w", padx=(0, 5))
+            ttk.Spinbox(
+                tuning,
+                from_=minimum,
+                to=maximum,
+                increment=increment,
+                textvariable=variable,
+                width=8,
+                format="%.2f",
+            ).grid(row=1, column=column, sticky="w", padx=(0, 5))
+
+        ttk.Checkbutton(
+            frame,
+            text="Speaker boost",
+            variable=self.elevenlabs_speaker_boost,
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
+
+        ttk.Label(
+            frame,
+            text="Generează audio și timpi exacți direct din același răspuns API.",
+            style='Info.TLabel',
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
+
+    def _on_voice_selected(self, event=None):
+        self.elevenlabs_voice_id.set(self.voice_ids.get(self.elevenlabs_voice.get(), ""))
+        self.save_config()
+
+    def load_elevenlabs_voices(self):
+        """Încarcă vocile fără a bloca interfața."""
+        api_key = self.elevenlabs_api_key.get().strip()
+        if not api_key:
+            messagebox.showerror("ElevenLabs", "Introdu cheia API ElevenLabs.")
+            return
+        self.load_voices_btn.config(state="disabled", text="Se încarcă...")
+
+        def worker():
+            try:
+                voices = ElevenLabsClient(api_key).list_voices()
+                self.root.after(0, self._apply_elevenlabs_voices, voices)
+            except Exception as error:
+                self.root.after(0, self._voice_load_failed, str(error))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_elevenlabs_voices(self, voices):
+        self.voice_ids = {
+            f"{voice['name']} — {voice['id'][-6:]}": voice["id"] for voice in voices
+        }
+        labels = list(self.voice_ids)
+        self.voice_combo.configure(values=labels)
+        saved_id = self.elevenlabs_voice_id.get()
+        selected = next((label for label, voice_id in self.voice_ids.items() if voice_id == saved_id), None)
+        if selected:
+            self.elevenlabs_voice.set(selected)
+        elif labels:
+            self.elevenlabs_voice.set(labels[0])
+            self.elevenlabs_voice_id.set(self.voice_ids[labels[0]])
+        self.load_voices_btn.config(state="normal", text="Reîncarcă vocile")
+        self.log_message(f"✅ Am încărcat {len(labels)} voci ElevenLabs.")
+        self.save_config()
+
+    def _voice_load_failed(self, message):
+        self.load_voices_btn.config(state="normal", text="Încarcă vocile")
+        self.log_message(f"❌ Nu pot încărca vocile: {message}")
+        messagebox.showerror("ElevenLabs", message)
 
     def create_settings_section(self, parent, row):
         """Secțiunea pentru setări"""
@@ -520,13 +703,39 @@ class CaptionUI:
         left_buttons = ttk.Frame(frame)
         left_buttons.grid(row=0, column=0, sticky="w")
 
-        self.generate_btn = ttk.Button(left_buttons, text="🚀 Generează Captions",
+        self.generate_tts_btn = ttk.Button(
+            left_buttons,
+            text="🎙️ Generează MP3 + SRT",
+            command=self.generate_elevenlabs_audio,
+            style='Modern.TButton',
+        )
+        self.generate_tts_btn.grid(row=0, column=0, padx=(0, 5))
+
+        self.generate_btn = ttk.Button(left_buttons, text="🎤 SRT din fișier (Whisper)",
                                      command=self.generate_captions, style='Modern.TButton')
-        self.generate_btn.grid(row=0, column=0, padx=(0, 5))
+        self.generate_btn.grid(row=0, column=1, padx=5)
 
         self.preview_btn = ttk.Button(left_buttons, text="🔍 Previzualizare",
                                     command=self.preview_captions, style='Modern.TButton', state='disabled')
-        self.preview_btn.grid(row=0, column=1, padx=5)
+        self.preview_btn.grid(row=0, column=2, padx=5)
+
+        self.play_btn = ttk.Button(
+            left_buttons,
+            text="▶ Redă ultima",
+            command=self.play_last_audio,
+            style='Modern.TButton',
+            state='disabled',
+        )
+        self.play_btn.grid(row=0, column=3, padx=5)
+
+        self.stop_btn = ttk.Button(
+            left_buttons,
+            text="■ Stop",
+            command=self.stop_audio,
+            style='Modern.TButton',
+            state='disabled',
+        )
+        self.stop_btn.grid(row=0, column=4, padx=5)
 
         # Right side buttons
         self.open_folder_btn = ttk.Button(frame, text="📁 Deschide Folder",
@@ -669,9 +878,197 @@ class CaptionUI:
             
     def log_message(self, message):
         """Adaugă mesaj în zona de output"""
+        if threading.current_thread() is not threading.main_thread():
+            self.root.after(0, self.log_message, message)
+            return
         self.output_text.insert(tk.END, f"{message}\n")
         self.output_text.see(tk.END)
         self.root.update_idletasks()
+
+    def _script_text(self):
+        text = self.original_text_widget.get('1.0', tk.END).strip()
+        return "" if text == SCRIPT_PLACEHOLDER else text
+
+    def generate_elevenlabs_audio(self):
+        """Generează MP3 și captions direct din timestampurile ElevenLabs."""
+        if self.is_processing:
+            messagebox.showwarning("Avertisment", "Generarea este deja în curs...")
+            return
+
+        api_key = self.elevenlabs_api_key.get().strip()
+        text = self._script_text()
+        voice_id = self.elevenlabs_voice_id.get().strip()
+        if not api_key:
+            messagebox.showerror("ElevenLabs", "Introdu cheia API ElevenLabs.")
+            return
+        if not text:
+            messagebox.showerror("ElevenLabs", "Introdu textul care trebuie transformat în voce.")
+            return
+        if not voice_id:
+            messagebox.showerror("ElevenLabs", "Încarcă și selectează o voce.")
+            return
+
+        try:
+            output_folder = Path(self.output_folder.get())
+            output_folder.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            messagebox.showerror("Folder de export", str(error))
+            return
+
+        params = {
+            "api_key": api_key,
+            "text": text,
+            "voice_id": voice_id,
+            "model_id": self.elevenlabs_model.get(),
+            "stability": float(self.elevenlabs_stability.get()),
+            "similarity_boost": float(self.elevenlabs_similarity.get()),
+            "style": float(self.elevenlabs_style.get()),
+            "speed": float(self.elevenlabs_speed.get()),
+            "speaker_boost": bool(self.elevenlabs_speaker_boost.get()),
+            "words": int(self.words_per_caption.get()),
+            "min_duration": float(self.min_duration.get()),
+            "max_duration": float(self.max_duration.get()),
+            "remove_punctuation": bool(self.remove_punctuation.get()),
+            "text_case": self.text_case.get().lower() if self.text_case.get() != "UPPER" else "upper",
+            "output_folder": output_folder,
+            "selected_formats": [fmt for fmt, var in self.output_formats.items() if var.get()],
+        }
+
+        self.is_processing = True
+        self.generate_tts_btn.config(state='disabled', text='⏳ Generez audio...')
+        self.generate_btn.config(state='disabled')
+        self.progress.start(10)
+        threading.Thread(
+            target=self._generate_elevenlabs_worker,
+            args=(params,),
+            daemon=True,
+        ).start()
+
+    def _generate_elevenlabs_worker(self, params):
+        mp3_path = None
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_name = f"{safe_file_stem(params['text'])}_{timestamp}"
+            mp3_path = params["output_folder"] / f"{base_name}.mp3"
+            srt_path = params["output_folder"] / f"{base_name}.srt"
+
+            self.log_message("🎙️ Generez vocea și timestampurile prin ElevenLabs...")
+            alignment = ElevenLabsClient(params["api_key"]).generate_with_timestamps(
+                text=params["text"],
+                voice_id=params["voice_id"],
+                output_path=mp3_path,
+                model_id=params["model_id"],
+                stability=params["stability"],
+                similarity_boost=params["similarity_boost"],
+                style=params["style"],
+                speed=params["speed"],
+                use_speaker_boost=params["speaker_boost"],
+            )
+            words = alignment_to_words(alignment)
+            captions = create_caption_segments(
+                words,
+                max_words=params["words"],
+                min_duration=params["min_duration"],
+                max_duration=params["max_duration"],
+                remove_punctuation=params["remove_punctuation"],
+                text_case=params["text_case"],
+            )
+            if not captions:
+                raise ElevenLabsError("ElevenLabs nu a furnizat cuvinte temporizate.")
+
+            exporter = self.generator or DynamicCaptionsGenerator(self.model_name.get())
+            self.generator = exporter
+            exporter.save_srt(captions, str(srt_path))
+            saved_files = [mp3_path.name, srt_path.name]
+
+            optional_formats = set(params["selected_formats"]) - {"SRT"}
+            if "VTT" in optional_formats:
+                path = params["output_folder"] / f"{base_name}.vtt"
+                exporter.save_vtt(captions, str(path))
+                saved_files.append(path.name)
+            if "JSON" in optional_formats:
+                path = params["output_folder"] / f"{base_name}.json"
+                exporter.save_json(captions, str(path))
+                saved_files.append(path.name)
+            if "CSV" in optional_formats:
+                path = params["output_folder"] / f"{base_name}.csv"
+                exporter.save_csv(captions, str(path))
+                saved_files.append(path.name)
+
+            self.last_generated_captions = [dict(caption) for caption in captions]
+            self.last_original_text = params["text"]
+            self.last_audio_path = str(mp3_path)
+            duration = captions[-1]["end"]
+            self.log_message(
+                f"✅ Gata: {len(captions)} captions, {len(words)} cuvinte, {duration:.1f}s."
+            )
+            self.log_message(f"💾 Salvate: {', '.join(saved_files)}")
+            self.root.after(0, self._finish_elevenlabs_generation, str(mp3_path), saved_files)
+        except Exception as error:
+            self.log_message(f"❌ Eroare ElevenLabs: {error}")
+            self.root.after(0, messagebox.showerror, "ElevenLabs", str(error))
+        finally:
+            self.root.after(0, self._reset_ui)
+
+    def _finish_elevenlabs_generation(self, mp3_path, saved_files):
+        self.audio_file.set(mp3_path)
+        self.preview_btn.config(state='normal')
+        self.play_btn.config(state='normal')
+        should_play = messagebox.askyesno(
+            "MP3 + SRT generate",
+            f"Fișiere create:\n{chr(10).join('• ' + name for name in saved_files)}\n\nRedau acum ultima variantă?",
+        )
+        if should_play:
+            self.play_last_audio()
+
+    def play_last_audio(self):
+        """Redă ultimul MP3 generat prin ffplay, cu control Stop."""
+        if not self.last_audio_path or not Path(self.last_audio_path).exists():
+            messagebox.showwarning("Redare", "Nu există încă un MP3 generat în această sesiune.")
+            return
+        ffplay = shutil.which("ffplay")
+        if not ffplay:
+            messagebox.showerror("Redare", "ffplay nu este disponibil. Instalează FFmpeg.")
+            return
+        self.stop_audio(log=False)
+        creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            self.playback_process = subprocess.Popen(
+                [ffplay, "-nodisp", "-autoexit", "-loglevel", "quiet", self.last_audio_path],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creation_flags,
+            )
+            self.stop_btn.config(state='normal')
+            self.log_message(f"▶ Redau: {Path(self.last_audio_path).name}")
+            self.root.after(250, self._watch_playback)
+        except OSError as error:
+            messagebox.showerror("Redare", f"Nu pot porni redarea:\n{error}")
+
+    def _watch_playback(self):
+        process = self.playback_process
+        if process is None:
+            return
+        if process.poll() is None:
+            self.root.after(250, self._watch_playback)
+            return
+        self.playback_process = None
+        self.stop_btn.config(state='disabled')
+
+    def stop_audio(self, log=True):
+        process = self.playback_process
+        if process and process.poll() is None:
+            process.terminate()
+            if log:
+                self.log_message("■ Redarea a fost oprită.")
+        self.playback_process = None
+        if hasattr(self, "stop_btn"):
+            self.stop_btn.config(state='disabled')
+
+    def _on_close(self):
+        self.stop_audio(log=False)
+        self.root.destroy()
         
     def generate_captions(self):
         """Generează captions în thread separat"""
@@ -696,6 +1093,7 @@ class CaptionUI:
         # Start processing în thread
         self.is_processing = True
         self.generate_btn.config(state='disabled', text='⏳ Generez...')
+        self.generate_tts_btn.config(state='disabled')
         self.progress.start(10)
         
         thread = threading.Thread(target=self._generate_captions_worker)
@@ -723,7 +1121,7 @@ class CaptionUI:
             original_text = None
             if self.use_original_text.get():
                 text = self.original_text_widget.get('1.0', tk.END).strip()
-                if text and text != "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+                if text and text != SCRIPT_PLACEHOLDER:
                     original_text = text
                     self.log_message(f"📝 Folosesc textul original pentru corectare ({len(text.split())} cuvinte)")
             
@@ -829,7 +1227,8 @@ class CaptionUI:
     def _reset_ui(self):
         """Resetează UI-ul după procesare"""
         self.is_processing = False
-        self.generate_btn.config(state='normal', text='🚀 Generează Captions')
+        self.generate_btn.config(state='normal', text='🎤 SRT din fișier (Whisper)')
+        self.generate_tts_btn.config(state='normal', text='🎙️ Generează MP3 + SRT')
         self.progress.stop()
         
     def preview_captions(self):
@@ -985,6 +1384,28 @@ class CaptionUI:
                 if 'model_name' in config:
                     self.model_name.set(config['model_name'])
 
+                elevenlabs = config.get('elevenlabs', {})
+                self.elevenlabs_voice_id.set(elevenlabs.get('voice_id', ''))
+                self.elevenlabs_voice.set(elevenlabs.get('voice_name', ''))
+                self.elevenlabs_model.set(
+                    elevenlabs.get('model_id', self.elevenlabs_model.get())
+                )
+                self.elevenlabs_stability.set(
+                    elevenlabs.get('stability', self.elevenlabs_stability.get())
+                )
+                self.elevenlabs_similarity.set(
+                    elevenlabs.get('similarity_boost', self.elevenlabs_similarity.get())
+                )
+                self.elevenlabs_style.set(
+                    elevenlabs.get('style', self.elevenlabs_style.get())
+                )
+                self.elevenlabs_speed.set(
+                    elevenlabs.get('speed', self.elevenlabs_speed.get())
+                )
+                self.elevenlabs_speaker_boost.set(
+                    elevenlabs.get('use_speaker_boost', self.elevenlabs_speaker_boost.get())
+                )
+
                 # Încarcă formatele de output
                 if 'output_formats' in config:
                     for fmt, value in config['output_formats'].items():
@@ -1012,12 +1433,15 @@ class CaptionUI:
                     audio_path = config['audio_file']
                     if os.path.exists(audio_path):
                         self.audio_file.set(audio_path)
+                        if Path(audio_path).suffix.lower() == '.mp3':
+                            self.last_audio_path = audio_path
+                            self.play_btn.config(state='normal')
                         self.log_message(f"🔄 Audio restaurat: {os.path.basename(audio_path)}")
 
                 # Încarcă textul original
                 if 'original_text' in config and config['original_text']:
                     # Curăță placeholder-ul
-                    if self.original_text_widget.get('1.0', tk.END).strip() == "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+                    if self.original_text_widget.get('1.0', tk.END).strip() == SCRIPT_PLACEHOLDER:
                         self.original_text_widget.delete('1.0', tk.END)
                         self.original_text_widget.config(fg='#2c3e50')
 
@@ -1025,16 +1449,22 @@ class CaptionUI:
                     self.update_text_stats()
                     self.log_message("📝 Text original restaurat din config")
 
-                print("✓ Config încărcat cu succes")
+                self.update_words_label(self.words_per_caption.get())
+                folder_name = os.path.basename(self.output_folder.get()) or "Root"
+                self.folder_info_label.config(
+                    text=f"💡 Fișierele se vor salva în: {folder_name}/"
+                )
+
+                print("Config incarcat cu succes")
         except Exception as e:
-            print(f"⚠️ Eroare la încărcarea config: {e}")
+            print(f"AVERTISMENT: Eroare la incarcarea config: {e}")
 
     def save_config(self):
         """Salvează setările curente în config file"""
         try:
             # Obține textul original (fără placeholder)
             original_text = self.original_text_widget.get('1.0', tk.END).strip()
-            if original_text == "Paste aici textul pe care l-ai folosit în ElevenLabs...":
+            if original_text == SCRIPT_PLACEHOLDER:
                 original_text = ""
 
             config = {
@@ -1049,14 +1479,24 @@ class CaptionUI:
                 'text_case': self.text_case.get(),
                 'output_folder': self.output_folder.get(),
                 'audio_file': self.audio_file.get(),
-                'original_text': original_text
+                'original_text': original_text,
+                'elevenlabs': {
+                    'voice_id': self.elevenlabs_voice_id.get(),
+                    'voice_name': self.elevenlabs_voice.get(),
+                    'model_id': self.elevenlabs_model.get(),
+                    'stability': self.elevenlabs_stability.get(),
+                    'similarity_boost': self.elevenlabs_similarity.get(),
+                    'style': self.elevenlabs_style.get(),
+                    'speed': self.elevenlabs_speed.get(),
+                    'use_speaker_boost': self.elevenlabs_speaker_boost.get(),
+                }
             }
 
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
         except Exception as e:
-            print(f"⚠️ Eroare la salvarea config: {e}")
+            print(f"AVERTISMENT: Eroare la salvarea config: {e}")
 
     def setup_config_auto_save(self):
         """Configurez salvarea automată la schimbarea setărilor"""
@@ -1067,6 +1507,13 @@ class CaptionUI:
         self.model_name.trace_add('write', lambda *args: self.save_config())
         self.remove_punctuation.trace_add('write', lambda *args: self.save_config())
         self.text_case.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_voice_id.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_model.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_stability.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_similarity.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_style.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_speed.trace_add('write', lambda *args: self.save_config())
+        self.elevenlabs_speaker_boost.trace_add('write', lambda *args: self.save_config())
 
         # Trace pentru calea audio
         self.audio_file.trace_add('write', lambda *args: self.save_config())

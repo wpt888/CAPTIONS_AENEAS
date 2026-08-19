@@ -62,7 +62,7 @@ if errorlevel 1 (
 )
 
 REM Instaleaza automat bibliotecile proiectului doar daca lipsesc.
-"%PYTHON_EXE%" -c "import whisper_timestamped, pydub, tkinterdnd2" >nul 2>&1
+"%PYTHON_EXE%" -c "import whisper_timestamped, pydub, tkinterdnd2, keyring" >nul 2>&1
 if errorlevel 1 (
     echo [SETUP] Instalez bibliotecile necesare. Prima instalare poate dura cateva minute...
     "%PYTHON_EXE%" -m pip install -r "%REQUIREMENTS%"

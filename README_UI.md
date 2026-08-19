@@ -14,6 +14,18 @@ Start_CaptionsUI.bat
 python caption_ui.py
 ```
 
+## 🎙️ Generare directă ElevenLabs
+
+Aplicația poate genera din aceeași interfață atât vocea MP3, cât și SRT-ul perfect sincronizat, fără Whisper:
+
+1. Introdu cheia API și apasă **Salvează sigur**. Cheia este păstrată în Windows Credential Manager, nu în proiect.
+2. Apasă **Încarcă vocile** și selectează vocea dorită.
+3. Introdu textul în zona din stânga și configurează vocea/captions.
+4. Apasă **Generează MP3 + SRT**.
+5. Folosește **Redă ultima** și **Stop** pentru verificarea rezultatului.
+
+ElevenLabs întoarce audio-ul și timestampurile în același răspuns. Whisper rămâne disponibil separat prin **SRT din fișier (Whisper)** pentru fișiere audio sau video externe.
+
 ## ✨ Funcționalități UI
 
 ### 📁 **Selecție Fișiere**
