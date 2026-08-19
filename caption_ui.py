@@ -80,7 +80,7 @@ except ImportError:
 class CaptionUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("🎬 Dynamic Captions Generator")
+        self.root.title("🎙️ Studio MP3 + SRT")
         # Setez fereastra să se deschidă maximizată
         try:
             self.root.state('zoomed')  # Windows
@@ -146,6 +146,8 @@ class CaptionUI:
         # Salvează config la schimbarea setărilor
         self.setup_config_auto_save()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        if self.elevenlabs_api_key.get().strip():
+            self.root.after(350, self.load_elevenlabs_voices)
         
     def setup_theme(self):
         """Configurez tema modernă"""
@@ -178,7 +180,11 @@ class CaptionUI:
         main_frame.columnconfigure(1, weight=1)
 
         # Title - span across both columns
-        title_label = ttk.Label(main_frame, text="🎬 Dynamic Captions Generator", style='Title.TLabel')
+        title_label = ttk.Label(
+            main_frame,
+            text="🎙️ Generează MP3 + SRT direct din text",
+            style='Title.TLabel',
+        )
         title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
 
         # LEFT COLUMN - Input and Text
@@ -186,11 +192,11 @@ class CaptionUI:
         left_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
         left_frame.columnconfigure(0, weight=1)
 
-        # File Input Section
-        self.create_file_section(left_frame, 0)
+        # Fluxul principal începe cu textul.
+        self.create_original_text_section(left_frame, 0)
 
-        # Original Text Section (pentru comparare și corectare)
-        self.create_original_text_section(left_frame, 1)
+        # Importul audio este un instrument separat, opțional.
+        self.create_file_section(left_frame, 1)
 
         # RIGHT COLUMN - Settings and Output
         right_frame = ttk.Frame(main_frame)
@@ -223,14 +229,19 @@ class CaptionUI:
         # Configure column frame weights
         for i in range(3):
             left_frame.rowconfigure(i, weight=0)
-        left_frame.rowconfigure(1, weight=1)  # Text section expandable
+        left_frame.rowconfigure(0, weight=1)  # Text section expandable
 
         for i in range(5):
             right_frame.rowconfigure(i, weight=0)
         
     def create_file_section(self, parent, row):
         """Secțiunea pentru selecția fișierului audio sau video"""
-        frame = ttk.LabelFrame(parent, text="📁 Fișier Audio / Video", padding=15, style='Card.TFrame')
+        frame = ttk.LabelFrame(
+            parent,
+            text="🎤 Opțional — SRT din audio extern cu Whisper",
+            padding=15,
+            style='Card.TFrame',
+        )
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
         frame.columnconfigure(1, weight=1)
         
@@ -270,14 +281,14 @@ class CaptionUI:
         
     def create_original_text_section(self, parent, row):
         """Secțiunea pentru textul original din ElevenLabs"""
-        frame = ttk.LabelFrame(parent, text="📝 Text / Script",
+        frame = ttk.LabelFrame(parent, text="1. Scrie sau lipește textul",
                              padding=15, style='Card.TFrame')
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
         frame.columnconfigure(0, weight=1)
 
         # Info label
         info_label = ttk.Label(frame,
-                             text="💡 Este folosit direct la generarea vocii sau pentru corectarea unui audio extern",
+                             text="💡 Nu ai nevoie de MP3 existent: aplicația va genera vocea și SRT-ul împreună",
                              style='Info.TLabel')
         info_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
 
@@ -442,6 +453,7 @@ class CaptionUI:
             keyring.set_password("CAPTIONS_AENEAS", "elevenlabs_api_key", api_key)
             self.log_message("🔐 Cheia ElevenLabs a fost salvată securizat în Windows.")
             messagebox.showinfo("ElevenLabs", "Cheia API a fost salvată în Windows Credential Manager.")
+            self.load_elevenlabs_voices()
         except Exception as error:
             messagebox.showerror("ElevenLabs", f"Nu pot salva cheia în Windows:\n{error}")
 
@@ -449,7 +461,7 @@ class CaptionUI:
         """Controale pentru generarea directă MP3 + SRT prin ElevenLabs."""
         frame = ttk.LabelFrame(
             parent,
-            text="🎙️ ElevenLabs — MP3 + SRT instant",
+            text="2. Alege vocea și generează",
             padding=15,
             style='Card.TFrame',
         )
@@ -520,6 +532,16 @@ class CaptionUI:
             text="Generează audio și timpi exacți direct din același răspuns API.",
             style='Info.TLabel',
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(5, 0))
+
+        self.generate_tts_btn = ttk.Button(
+            frame,
+            text="🎙️ GENEREAZĂ MP3 + SRT DIN TEXT",
+            command=self.generate_elevenlabs_audio,
+            style='Modern.TButton',
+        )
+        self.generate_tts_btn.grid(
+            row=6, column=0, columnspan=3, sticky="ew", pady=(12, 0), ipady=5
+        )
 
     def _on_voice_selected(self, event=None):
         self.elevenlabs_voice_id.set(self.voice_ids.get(self.elevenlabs_voice.get(), ""))
@@ -703,21 +725,13 @@ class CaptionUI:
         left_buttons = ttk.Frame(frame)
         left_buttons.grid(row=0, column=0, sticky="w")
 
-        self.generate_tts_btn = ttk.Button(
-            left_buttons,
-            text="🎙️ Generează MP3 + SRT",
-            command=self.generate_elevenlabs_audio,
-            style='Modern.TButton',
-        )
-        self.generate_tts_btn.grid(row=0, column=0, padx=(0, 5))
-
         self.generate_btn = ttk.Button(left_buttons, text="🎤 SRT din fișier (Whisper)",
                                      command=self.generate_captions, style='Modern.TButton')
-        self.generate_btn.grid(row=0, column=1, padx=5)
+        self.generate_btn.grid(row=0, column=0, padx=(0, 5))
 
         self.preview_btn = ttk.Button(left_buttons, text="🔍 Previzualizare",
                                     command=self.preview_captions, style='Modern.TButton', state='disabled')
-        self.preview_btn.grid(row=0, column=2, padx=5)
+        self.preview_btn.grid(row=0, column=1, padx=5)
 
         self.play_btn = ttk.Button(
             left_buttons,
@@ -726,7 +740,7 @@ class CaptionUI:
             style='Modern.TButton',
             state='disabled',
         )
-        self.play_btn.grid(row=0, column=3, padx=5)
+        self.play_btn.grid(row=0, column=2, padx=5)
 
         self.stop_btn = ttk.Button(
             left_buttons,
@@ -735,7 +749,7 @@ class CaptionUI:
             style='Modern.TButton',
             state='disabled',
         )
-        self.stop_btn.grid(row=0, column=4, padx=5)
+        self.stop_btn.grid(row=0, column=3, padx=5)
 
         # Right side buttons
         self.open_folder_btn = ttk.Button(frame, text="📁 Deschide Folder",
@@ -1228,7 +1242,7 @@ class CaptionUI:
         """Resetează UI-ul după procesare"""
         self.is_processing = False
         self.generate_btn.config(state='normal', text='🎤 SRT din fișier (Whisper)')
-        self.generate_tts_btn.config(state='normal', text='🎙️ Generează MP3 + SRT')
+        self.generate_tts_btn.config(state='normal', text='🎙️ GENEREAZĂ MP3 + SRT DIN TEXT')
         self.progress.stop()
         
     def preview_captions(self):
