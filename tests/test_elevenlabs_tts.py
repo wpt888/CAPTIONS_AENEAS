@@ -9,6 +9,7 @@ from elevenlabs_tts import (
     ElevenLabsClient,
     alignment_to_words,
     create_caption_segments,
+    create_estimated_caption_segments,
     is_elevenlabs_mp3,
     load_elevenlabs_timing_source,
     safe_file_stem,
@@ -30,6 +31,19 @@ class FakeResponse:
 
 
 class ElevenLabsTTSTests(unittest.TestCase):
+    def test_estimated_segments_keep_audio_duration_without_provider_timestamps(self):
+        segments = create_estimated_caption_segments(
+            "Un test simplu.",
+            3.0,
+            max_words=2,
+            min_duration=0.6,
+            max_duration=3.0,
+        )
+
+        self.assertEqual([segment["text"] for segment in segments], ["Un test", "simplu."])
+        self.assertEqual(segments[0]["start"], 0.0)
+        self.assertEqual(segments[-1]["end"], 3.0)
+
     def test_elevenlabs_mp3_is_detected_by_filename(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "ElevenLabs_2026-09-19_voice.mp3"

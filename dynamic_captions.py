@@ -14,7 +14,11 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import re
-from elevenlabs_tts import is_elevenlabs_mp3, load_elevenlabs_timing_source
+from elevenlabs_tts import (
+    create_estimated_caption_segments,
+    is_elevenlabs_mp3,
+    load_elevenlabs_timing_source,
+)
 
 # Setez FFmpeg în PATH dacă există
 def setup_ffmpeg_path():
@@ -280,11 +284,49 @@ class DynamicCaptionsGenerator:
                 text_case=text_case,
             )
             if timing_source is None:
-                raise RuntimeError(
-                    "MP3-ul este identificat ca ElevenLabs, dar nu are "
-                    "timestampuri asociate. Păstrează SRT/JSON-ul sincronizat "
-                    "lângă MP3 sau generează MP3 + SRT din fluxul ElevenLabs."
+                if not original_text:
+                    raise RuntimeError(
+                        "MP3-ul este identificat ca ElevenLabs, dar nu are "
+                        "timestampuri asociate. Introdu textul original sau "
+                        "păstrează SRT/JSON-ul sincronizat lângă MP3."
+                    )
+                try:
+                    audio_duration = len(AudioSegment.from_file(input_path)) / 1000.0
+                except Exception as error:
+                    raise RuntimeError(
+                        "Nu pot citi durata MP3-ului ElevenLabs pentru fallback. "
+                        "Verifică instalarea FFmpeg."
+                    ) from error
+                captions = create_estimated_caption_segments(
+                    original_text,
+                    audio_duration,
+                    max_words=max_words_per_caption,
+                    min_duration=min_duration,
+                    max_duration=max_duration,
+                    remove_punctuation=remove_punctuation,
+                    text_case=text_case,
                 )
+                if not captions:
+                    raise RuntimeError("Textul original nu a putut fi transformat în captions.")
+                print(
+                    "ElevenLabs fără timinguri per cuvânt; folosesc textul original "
+                    "și durata audio pentru timing estimativ."
+                )
+                return {
+                    'captions': captions,
+                    'stats': {
+                        'total_words': sum(segment['word_count'] for segment in captions),
+                        'total_captions': len(captions),
+                        'avg_words_per_caption': (
+                            sum(segment['word_count'] for segment in captions) / len(captions)
+                            if captions else 0
+                        ),
+                        'total_duration': captions[-1]['end'] if captions else 0,
+                        'source_was_video': False,
+                        'timing_source': 'ElevenLabs script + duration estimate',
+                        'timing_exact': False,
+                    },
+                }
 
             captions, source_path = timing_source
             print(f"ElevenLabs detectat; folosesc timingurile din: {source_path}")
@@ -301,6 +343,7 @@ class DynamicCaptionsGenerator:
                     'source_was_video': False,
                     'timing_source': 'ElevenLabs',
                     'timing_source_path': source_path,
+                    'timing_exact': True,
                 },
             }
 

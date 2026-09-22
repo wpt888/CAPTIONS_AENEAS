@@ -420,6 +420,59 @@ def create_caption_segments(
     return segments
 
 
+def create_estimated_caption_segments(
+    text: str,
+    audio_duration: float,
+    *,
+    max_words: int = 2,
+    min_duration: float = 0.6,
+    max_duration: float = 3.0,
+    remove_punctuation: bool = False,
+    text_case: str = "normal",
+) -> list[dict[str, Any]]:
+    """Creează un fallback fără Whisper din text și durata audio-ului.
+
+    Un MP3 ElevenLabs descărcat separat nu conține alinierea pe cuvinte.
+    Această funcție păstrează textul și durata totală, dar rezultatul este
+    estimativ și este marcat astfel de caller.
+    """
+    tokens = text.split()
+    duration = float(audio_duration)
+    if not tokens or duration <= 0:
+        return []
+
+    weights = [
+        max(1, len(re.sub(r"[^\w]", "", token, flags=re.UNICODE)))
+        for token in tokens
+    ]
+    total_weight = sum(weights)
+    words: list[dict[str, Any]] = []
+    elapsed_weight = 0
+    for token, weight in zip(tokens, weights):
+        start = duration * elapsed_weight / total_weight
+        elapsed_weight += weight
+        end = duration * elapsed_weight / total_weight
+        words.append({
+            "text": token,
+            "start": start,
+            "end": max(end, start + 0.01),
+            "confidence": 0.0,
+        })
+
+    captions = create_caption_segments(
+        words,
+        max_words=max_words,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        remove_punctuation=remove_punctuation,
+        text_case=text_case,
+    )
+    for caption in captions:
+        caption["end"] = min(float(caption["end"]), duration)
+        caption["duration"] = caption["end"] - caption["start"]
+    return [caption for caption in captions if caption["end"] > caption["start"]]
+
+
 def safe_file_stem(text: str, fallback: str = "elevenlabs") -> str:
     """Creează un nume de fișier scurt și portabil din începutul textului."""
     normalized = unicodedata.normalize("NFKD", text)

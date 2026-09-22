@@ -1212,6 +1212,12 @@ class CaptionUI:
             self.log_message(f"✅ Succes! Generat {len(captions)} captions din {total_words} cuvinte")
             self.log_message(f"📊 Statistici: {avg_words:.1f} cuvinte/caption, {total_duration:.1f}s durată totală")
 
+            if stats.get('timing_exact') is False:
+                self.log_message(
+                    "⚠️ MP3-ul ElevenLabs nu conține timpi pe cuvinte; "
+                    "SRT-ul folosește o estimare din text și durata audio."
+                )
+
             # Afișează dacă sursa a fost video
             if stats.get('source_was_video'):
                 self.log_message(f"🎬 Sursă: Video (audio extras automat)")
