@@ -23,6 +23,7 @@ from elevenlabs_tts import (
     ElevenLabsError,
     alignment_to_words,
     create_caption_segments,
+    is_elevenlabs_mp3,
     safe_file_stem,
 )
 
@@ -1119,10 +1120,6 @@ class CaptionUI:
         try:
             self.log_message("🚀 Încep generarea captions-urilor...")
             
-            # Inițializez generatorul
-            if not self.generator:
-                self.generator = DynamicCaptionsGenerator(self.model_name.get())
-                
             # Parametrii
             audio_path = self.audio_file.get()
             words = self.words_per_caption.get()
@@ -1149,8 +1146,17 @@ class CaptionUI:
             
             self.log_message(f"📝 Parametrii: {words} cuvinte/caption, {min_dur}-{max_dur}s durată{format_str}")
             
+            # Generatorul decide înainte de încărcarea modelului dacă MP3-ul
+            # are timinguri ElevenLabs asociate.
+            if is_elevenlabs_mp3(audio_path):
+                self.log_message("🎙️ ElevenLabs detectat; folosesc timingurile asociate fără CUDA...")
+            else:
+                self.log_message("🎤 Transcriu audio cu Whisper AI...")
+
+            if not self.generator:
+                self.generator = DynamicCaptionsGenerator(self.model_name.get())
+
             # Generez captions
-            self.log_message("🎤 Transcriu audio cu Whisper AI...")
             result = self.generator.generate_dynamic_captions(
                 audio_path, words, min_dur, max_dur,
                 output_dir=self.output_folder.get(),

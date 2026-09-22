@@ -9,6 +9,8 @@ from elevenlabs_tts import (
     ElevenLabsClient,
     alignment_to_words,
     create_caption_segments,
+    is_elevenlabs_mp3,
+    load_elevenlabs_timing_source,
     safe_file_stem,
 )
 
@@ -28,6 +30,48 @@ class FakeResponse:
 
 
 class ElevenLabsTTSTests(unittest.TestCase):
+    def test_elevenlabs_mp3_is_detected_by_filename(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "ElevenLabs_2026-09-19_voice.mp3"
+            path.write_bytes(b"fake-mp3")
+            self.assertTrue(is_elevenlabs_mp3(path))
+
+    def test_elevenlabs_timing_source_uses_companion_srt(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audio_path = Path(temp_dir) / "ElevenLabs_voice.mp3"
+            srt_path = audio_path.with_suffix(".srt")
+            audio_path.write_bytes(b"fake-mp3")
+            srt_path.write_text(
+                "1\n00:00:00,120 --> 00:00:00,700\nSalut, lume!\n",
+                encoding="utf-8",
+            )
+
+            result = load_elevenlabs_timing_source(
+                audio_path,
+                max_words=2,
+                min_duration=0.6,
+                max_duration=3.0,
+            )
+
+            self.assertIsNotNone(result)
+            captions, source = result
+            self.assertEqual(Path(source), srt_path)
+            self.assertEqual(captions[0]["start"], 0.12)
+            self.assertEqual(captions[0]["end"], 0.7)
+
+    def test_elevenlabs_without_timing_source_does_not_fallback_to_whisper(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "ElevenLabs_voice.mp3"
+            path.write_bytes(b"fake-mp3")
+            self.assertIsNone(
+                load_elevenlabs_timing_source(
+                    path,
+                    max_words=2,
+                    min_duration=0.6,
+                    max_duration=3.0,
+                )
+            )
+
     def test_alignment_is_converted_to_timed_words(self):
         text = "Salut, lume!"
         alignment = {

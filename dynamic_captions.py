@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import re
+from elevenlabs_tts import is_elevenlabs_mp3, load_elevenlabs_timing_source
 
 # Setez FFmpeg în PATH dacă există
 def setup_ffmpeg_path():
@@ -259,9 +260,6 @@ class DynamicCaptionsGenerator:
             original_text: Textul original pentru corectare automată
         """
 
-        if not self.model:
-            self.load_model()
-
         input_path = Path(audio_path)
         if not input_path.exists():
             raise FileNotFoundError(f"Fișierul nu există: {input_path}")
@@ -271,6 +269,43 @@ class DynamicCaptionsGenerator:
         else:
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
+
+        if is_elevenlabs_mp3(input_path):
+            timing_source = load_elevenlabs_timing_source(
+                input_path,
+                max_words=max_words_per_caption,
+                min_duration=min_duration,
+                max_duration=max_duration,
+                remove_punctuation=remove_punctuation,
+                text_case=text_case,
+            )
+            if timing_source is None:
+                raise RuntimeError(
+                    "MP3-ul este identificat ca ElevenLabs, dar nu are "
+                    "timestampuri asociate. Păstrează SRT/JSON-ul sincronizat "
+                    "lângă MP3 sau generează MP3 + SRT din fluxul ElevenLabs."
+                )
+
+            captions, source_path = timing_source
+            print(f"ElevenLabs detectat; folosesc timingurile din: {source_path}")
+            return {
+                'captions': captions,
+                'stats': {
+                    'total_words': sum(segment['word_count'] for segment in captions),
+                    'total_captions': len(captions),
+                    'avg_words_per_caption': (
+                        sum(segment['word_count'] for segment in captions) / len(captions)
+                        if captions else 0
+                    ),
+                    'total_duration': captions[-1]['end'] if captions else 0,
+                    'source_was_video': False,
+                    'timing_source': 'ElevenLabs',
+                    'timing_source_path': source_path,
+                },
+            }
+
+        if not self.model:
+            self.load_model()
 
         # Detectează tipul fișierului și extrage audio dacă e video
         processing_path = input_path

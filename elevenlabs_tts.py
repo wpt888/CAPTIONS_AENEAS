@@ -7,7 +7,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,6 +15,196 @@ from urllib.request import Request, urlopen
 
 class ElevenLabsError(RuntimeError):
     """Eroare sigură, potrivită pentru afișare în interfață."""
+
+
+def is_elevenlabs_mp3(audio_path: str | Path) -> bool:
+    """Identifică un MP3 ElevenLabs fără să decodeze audio-ul.
+
+    MP3-urile descărcate din ElevenLabs folosesc de obicei prefixul
+    ``ElevenLabs_`` și includ markerul C2PA ``ElevenLabs`` în ID3. Sunt
+    acceptate ambele semnale, deoarece fișierele mai vechi pot să nu aibă
+    manifestul C2PA.
+    """
+    path = Path(audio_path)
+    if path.suffix.lower() != ".mp3":
+        return False
+    if path.name.casefold().startswith("elevenlabs_"):
+        return True
+
+    try:
+        with path.open("rb") as audio_file:
+            header = audio_file.read(1024 * 1024)
+    except OSError:
+        return False
+
+    header_lower = header.lower()
+    return b"elevenlabs" in header_lower and b"c2pa" in header_lower
+
+
+def _format_provider_text(text: str, remove_punctuation: bool, text_case: str) -> str:
+    return _format_text(text, remove_punctuation, text_case).strip()
+
+
+def _normalize_segments(
+    segments: Iterable[dict[str, Any]],
+    *,
+    remove_punctuation: bool,
+    text_case: str,
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for segment in segments:
+        try:
+            start = float(segment["start"])
+            end = float(segment["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        text = _format_provider_text(
+            str(segment.get("text", "")), remove_punctuation, text_case
+        )
+        if not text or end <= start:
+            continue
+        normalized.append({
+            "id": len(normalized) + 1,
+            "text": text,
+            "start": start,
+            "end": end,
+            "word_count": len(text.split()),
+            "words": [dict(word) for word in segment.get("words", [])],
+            "duration": end - start,
+        })
+    return normalized
+
+
+def _parse_srt_time(value: str) -> float:
+    value = value.strip().replace(",", ".")
+    hours, minutes, seconds = value.split(":")
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def _read_srt_segments(
+    path: Path,
+    *,
+    remove_punctuation: bool,
+    text_case: str,
+) -> list[dict[str, Any]]:
+    try:
+        content = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        content = path.read_text(encoding="cp1252")
+
+    parsed: list[dict[str, Any]] = []
+    blocks = re.split(r"\r?\n\s*\r?\n", content.strip())
+    for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        timing_index = next(
+            (index for index, line in enumerate(lines) if "-->" in line), None
+        )
+        if timing_index is None or timing_index + 1 >= len(lines):
+            continue
+        start_text, end_text = [part.strip() for part in lines[timing_index].split("-->", 1)]
+        try:
+            start = _parse_srt_time(start_text.split()[0])
+            end = _parse_srt_time(end_text.split()[0])
+        except (ValueError, IndexError):
+            continue
+        parsed.append({"start": start, "end": end, "text": " ".join(lines[timing_index + 1:])})
+    return _normalize_segments(
+        parsed,
+        remove_punctuation=remove_punctuation,
+        text_case=text_case,
+    )
+
+
+def _read_json_timing_source(
+    path: Path,
+    *,
+    max_words: int,
+    min_duration: float,
+    max_duration: float,
+    remove_punctuation: bool,
+    text_case: str,
+) -> list[dict[str, Any]]:
+    with path.open("r", encoding="utf-8-sig") as metadata_file:
+        payload = json.load(metadata_file)
+
+    if isinstance(payload, dict) and isinstance(payload.get("segments"), list):
+        return _normalize_segments(
+            payload["segments"],
+            remove_punctuation=remove_punctuation,
+            text_case=text_case,
+        )
+
+    alignment = payload.get("alignment") if isinstance(payload, dict) else None
+    if not alignment and isinstance(payload, dict):
+        alignment = payload.get("normalized_alignment")
+    if isinstance(alignment, dict):
+        words = alignment_to_words(alignment)
+        return create_caption_segments(
+            words,
+            max_words=max_words,
+            min_duration=min_duration,
+            max_duration=max_duration,
+            remove_punctuation=remove_punctuation,
+            text_case=text_case,
+        )
+    return []
+
+
+def load_elevenlabs_timing_source(
+    audio_path: str | Path,
+    *,
+    max_words: int,
+    min_duration: float,
+    max_duration: float,
+    remove_punctuation: bool = False,
+    text_case: str = "normal",
+) -> tuple[list[dict[str, Any]], str] | None:
+    """Încarcă timingurile ElevenLabs asociate unui MP3.
+
+    API-ul ElevenLabs livrează alinierea în răspunsul JSON, nu în fluxul audio
+    MP3. Fluxul local păstrează acea aliniere în SRT/JSON lângă MP3; funcția
+    caută mai întâi aceste surse și nu pornește Whisper dacă le găsește.
+    """
+    path = Path(audio_path)
+    if not is_elevenlabs_mp3(path):
+        return None
+
+    json_candidates = [path.with_suffix(".elevenlabs.json"), path.with_suffix(".json")]
+    json_candidates.extend(sorted(path.parent.glob(f"{path.stem}_captions_*.json"), reverse=True))
+    for candidate in json_candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            captions = _read_json_timing_source(
+                candidate,
+                max_words=max_words,
+                min_duration=min_duration,
+                max_duration=max_duration,
+                remove_punctuation=remove_punctuation,
+                text_case=text_case,
+            )
+        except (OSError, ValueError, KeyError, TypeError, ElevenLabsError):
+            continue
+        if captions:
+            return captions, str(candidate)
+
+    srt_candidates = [path.with_suffix(".srt")]
+    srt_candidates.extend(sorted(path.parent.glob(f"{path.stem}_captions_*.srt"), reverse=True))
+    srt_candidates.extend(sorted(path.parent.glob(f"{path.stem}_approved_*.srt"), reverse=True))
+    for candidate in srt_candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            captions = _read_srt_segments(
+                candidate,
+                remove_punctuation=remove_punctuation,
+                text_case=text_case,
+            )
+        except OSError:
+            continue
+        if captions:
+            return captions, str(candidate)
+    return None
 
 
 class ElevenLabsClient:
