@@ -9,7 +9,6 @@ from elevenlabs_tts import (
     ElevenLabsClient,
     alignment_to_words,
     create_caption_segments,
-    create_estimated_caption_segments,
     is_elevenlabs_mp3,
     load_elevenlabs_timing_source,
     safe_file_stem,
@@ -31,19 +30,6 @@ class FakeResponse:
 
 
 class ElevenLabsTTSTests(unittest.TestCase):
-    def test_estimated_segments_keep_audio_duration_without_provider_timestamps(self):
-        segments = create_estimated_caption_segments(
-            "Un test simplu.",
-            3.0,
-            max_words=2,
-            min_duration=0.6,
-            max_duration=3.0,
-        )
-
-        self.assertEqual([segment["text"] for segment in segments], ["Un test", "simplu."])
-        self.assertEqual(segments[0]["start"], 0.0)
-        self.assertEqual(segments[-1]["end"], 3.0)
-
     def test_elevenlabs_mp3_is_detected_by_filename(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "ElevenLabs_2026-09-19_voice.mp3"
@@ -73,7 +59,7 @@ class ElevenLabsTTSTests(unittest.TestCase):
             self.assertEqual(captions[0]["start"], 0.12)
             self.assertEqual(captions[0]["end"], 0.7)
 
-    def test_elevenlabs_without_timing_source_does_not_fallback_to_whisper(self):
+    def test_elevenlabs_without_timing_source_returns_none(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "ElevenLabs_voice.mp3"
             path.write_bytes(b"fake-mp3")
@@ -85,6 +71,39 @@ class ElevenLabsTTSTests(unittest.TestCase):
                     max_duration=3.0,
                 )
             )
+
+    def test_old_generated_srt_is_not_treated_as_provider_timing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audio_path = Path(temp_dir) / "ElevenLabs_voice.mp3"
+            audio_path.write_bytes(b"fake-mp3")
+            (audio_path.parent / "ElevenLabs_voice_captions_20260924_100025.srt").write_text(
+                "1\n00:00:00,000 --> 00:00:03,000\nSalut!\n", encoding="utf-8"
+            )
+
+            self.assertIsNone(load_elevenlabs_timing_source(
+                audio_path, max_words=2, min_duration=0.6, max_duration=3.0
+            ))
+
+    @patch("elevenlabs_tts.urlopen")
+    def test_forced_alignment_posts_audio_and_returns_word_timing(self, mocked_urlopen):
+        mocked_urlopen.return_value = FakeResponse({"words": [
+            {"text": "Salut,", "start": 0.3, "end": 0.7, "loss": 0.01},
+            {"text": " ", "start": 0.7, "end": 1.2, "loss": 0.01},
+            {"text": "lume!", "start": 1.2, "end": 1.6, "loss": 0.02},
+        ]})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audio_path = Path(temp_dir) / "voice.mp3"
+            audio_path.write_bytes(b"test-audio")
+            words = ElevenLabsClient("secret").force_align_audio(audio_path, "Salut, lume!")
+
+        self.assertEqual([(word["start"], word["end"]) for word in words],
+                         [(0.3, 0.7), (1.2, 1.6)])
+        request = mocked_urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.elevenlabs.io/v1/forced-alignment")
+        self.assertIn(b'test-audio', request.data)
+        self.assertIn(b'Salut, lume!', request.data)
+        self.assertIn(b'name="file"', request.data)
+        self.assertIn(b'name="text"', request.data)
 
     def test_alignment_is_converted_to_timed_words(self):
         text = "Salut, lume!"

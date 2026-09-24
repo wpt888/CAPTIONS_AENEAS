@@ -239,7 +239,7 @@ class CaptionUI:
         """Secțiunea pentru selecția fișierului audio sau video"""
         frame = ttk.LabelFrame(
             parent,
-            text="🎤 Opțional — SRT din audio extern cu Whisper",
+            text="🎤 Opțional — SRT din fișier audio",
             padding=15,
             style='Card.TFrame',
         )
@@ -279,6 +279,12 @@ class CaptionUI:
         info_label = ttk.Label(frame, text="💡 Audio: MP3, WAV, M4A, FLAC | Video: MP4, AVI, MKV, MOV (audio extras automat)",
                              style='Info.TLabel')
         info_label.grid(row=2, column=0, columnspan=3, sticky="w", pady=(5, 0))
+        ttk.Label(
+            frame,
+            text="MP3 ElevenLabs fără timpi: textul și cheia API permit alinierea online (consumă credite).",
+            style='Info.TLabel',
+            wraplength=600,
+        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(5, 0))
         
     def create_original_text_section(self, parent, row):
         """Secțiunea pentru textul original din ElevenLabs"""
@@ -344,7 +350,7 @@ class CaptionUI:
         self.use_original_text = tk.BooleanVar(value=True)
         self.correction_cb = ttk.Checkbutton(
             frame,
-            text="✅ Folosește textul original pentru corectarea automată a cuvintelor",
+            text="✅ Folosește textul original pentru sincronizare și corectare",
             variable=self.use_original_text
         )
         self.correction_cb.grid(row=3, column=0, sticky="w", pady=(10, 0))
@@ -726,7 +732,7 @@ class CaptionUI:
         left_buttons = ttk.Frame(frame)
         left_buttons.grid(row=0, column=0, sticky="w")
 
-        self.generate_btn = ttk.Button(left_buttons, text="🎤 SRT din fișier (Whisper)",
+        self.generate_btn = ttk.Button(left_buttons, text="🎤 SRT din fișier audio",
                                      command=self.generate_captions, style='Modern.TButton')
         self.generate_btn.grid(row=0, column=0, padx=(0, 5))
 
@@ -1146,10 +1152,8 @@ class CaptionUI:
             
             self.log_message(f"📝 Parametrii: {words} cuvinte/caption, {min_dur}-{max_dur}s durată{format_str}")
             
-            # Generatorul decide înainte de încărcarea modelului dacă MP3-ul
-            # are timinguri ElevenLabs asociate.
             if is_elevenlabs_mp3(audio_path):
-                self.log_message("🎙️ ElevenLabs detectat; folosesc timingurile asociate fără CUDA...")
+                self.log_message("🎙️ ElevenLabs detectat; verific timpii asociați sau aliniez textul la audio...")
             else:
                 self.log_message("🎤 Transcriu audio cu Whisper AI...")
 
@@ -1162,7 +1166,8 @@ class CaptionUI:
                 output_dir=self.output_folder.get(),
                 remove_punctuation=remove_punct,
                 text_case=text_case,
-                original_text=original_text
+                original_text=original_text,
+                elevenlabs_api_key=self.elevenlabs_api_key.get().strip(),
             )
             
             if not result or not result.get('captions'):
@@ -1212,11 +1217,8 @@ class CaptionUI:
             self.log_message(f"✅ Succes! Generat {len(captions)} captions din {total_words} cuvinte")
             self.log_message(f"📊 Statistici: {avg_words:.1f} cuvinte/caption, {total_duration:.1f}s durată totală")
 
-            if stats.get('timing_exact') is False:
-                self.log_message(
-                    "⚠️ MP3-ul ElevenLabs nu conține timpi pe cuvinte; "
-                    "SRT-ul folosește o estimare din text și durata audio."
-                )
+            if stats.get('timing_source'):
+                self.log_message(f"⏱️ Sursa timpilor: {stats['timing_source']}")
 
             # Afișează dacă sursa a fost video
             if stats.get('source_was_video'):

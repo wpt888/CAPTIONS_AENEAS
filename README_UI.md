@@ -24,7 +24,9 @@ Aplicația poate genera din aceeași interfață atât vocea MP3, cât și SRT-u
 4. Apasă **Generează MP3 + SRT**.
 5. Folosește **Redă ultima** și **Stop** pentru verificarea rezultatului.
 
-Nu trebuie selectat niciun fișier audio pentru acest flux. ElevenLabs întoarce audio-ul și timestampurile în același răspuns. Whisper rămâne disponibil separat prin **SRT din fișier (Whisper)** pentru fișiere audio sau video externe.
+Nu trebuie selectat niciun fișier audio pentru acest flux. ElevenLabs întoarce audio-ul și timestampurile în același răspuns.
+
+Pentru un MP3 ElevenLabs descărcat separat, selectează fișierul, păstrează textul original în interfață și apasă **SRT din fișier audio**. Aplicația folosește mai întâi un SRT/JSON sincronizat aflat lângă MP3; dacă nu există, aliniază textul la audio prin API-ul ElevenLabs folosind cheia salvată. Această cerere consumă credite ElevenLabs. Fără cheie sau text original, folosește Whisper local. SRT-urile generate anterior prin estimarea din durata totală nu sunt reutilizate ca surse de timp.
 
 ## ✨ Funcționalități UI
 

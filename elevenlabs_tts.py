@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import base64
 import json
+import mimetypes
 import re
 import unicodedata
+import uuid
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
@@ -169,8 +171,9 @@ def load_elevenlabs_timing_source(
     if not is_elevenlabs_mp3(path):
         return None
 
+    # Exporturile _captions_* pot proveni din vechea estimare pe durata totală.
+    # Nu le reutilizăm ca și cum ar avea timpi măsurați din audio.
     json_candidates = [path.with_suffix(".elevenlabs.json"), path.with_suffix(".json")]
-    json_candidates.extend(sorted(path.parent.glob(f"{path.stem}_captions_*.json"), reverse=True))
     for candidate in json_candidates:
         if not candidate.is_file():
             continue
@@ -189,7 +192,6 @@ def load_elevenlabs_timing_source(
             return captions, str(candidate)
 
     srt_candidates = [path.with_suffix(".srt")]
-    srt_candidates.extend(sorted(path.parent.glob(f"{path.stem}_captions_*.srt"), reverse=True))
     srt_candidates.extend(sorted(path.parent.glob(f"{path.stem}_approved_*.srt"), reverse=True))
     for candidate in srt_candidates:
         if not candidate.is_file():
@@ -252,6 +254,56 @@ class ElevenLabsClient:
             if voice.get("voice_id")
         ]
         return sorted(voices, key=lambda voice: voice["name"].casefold())
+
+    def force_align_audio(self, audio_path: str | Path, text: str) -> list[dict[str, Any]]:
+        """Obține timpii cuvintelor din MP3-ul existent și transcriptul său."""
+        path = Path(audio_path)
+        if not text.strip():
+            raise ElevenLabsError("Introdu textul original pentru alinierea audio.")
+        try:
+            audio_bytes = path.read_bytes()
+        except OSError as error:
+            raise ElevenLabsError(f"Nu pot citi fișierul audio: {path}") from error
+
+        boundary = f"codex-{uuid.uuid4().hex}"
+        filename = path.name.replace('"', "_").replace("\r", "_").replace("\n", "_")
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        body = (
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"text\"\r\n\r\n".encode()
+            + text.encode("utf-8")
+            + f"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: {content_type}\r\n\r\n".encode("utf-8")
+            + audio_bytes
+            + f"\r\n--{boundary}--\r\n".encode()
+        )
+        request = Request(
+            f"{self.BASE_URL}/forced-alignment",
+            data=body,
+            method="POST",
+            headers={
+                "xi-api-key": self.api_key,
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Accept": "application/json",
+            },
+        )
+        payload = self._request_json(request)
+        words = payload.get("words") if isinstance(payload, dict) else None
+        if not isinstance(words, list) or not words:
+            raise ElevenLabsError("ElevenLabs nu a returnat timpi pe cuvinte.")
+        timed_words = []
+        for word in words:
+            try:
+                word_text = str(word["text"]).strip()
+                start, end = float(word["start"]), float(word["end"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise ElevenLabsError("Răspunsul de aliniere ElevenLabs este incomplet.") from error
+            if not word_text:
+                continue
+            if start < 0 or end <= start:
+                raise ElevenLabsError("ElevenLabs a returnat timpi invalizi pentru un cuvânt.")
+            timed_words.append({"text": word_text, "start": start, "end": end, "confidence": 1.0})
+        if not timed_words:
+            raise ElevenLabsError("ElevenLabs nu a returnat cuvinte temporizate.")
+        return timed_words
 
     def generate_with_timestamps(
         self,
@@ -418,59 +470,6 @@ def create_caption_segments(
         current = []
 
     return segments
-
-
-def create_estimated_caption_segments(
-    text: str,
-    audio_duration: float,
-    *,
-    max_words: int = 2,
-    min_duration: float = 0.6,
-    max_duration: float = 3.0,
-    remove_punctuation: bool = False,
-    text_case: str = "normal",
-) -> list[dict[str, Any]]:
-    """Creează un fallback fără Whisper din text și durata audio-ului.
-
-    Un MP3 ElevenLabs descărcat separat nu conține alinierea pe cuvinte.
-    Această funcție păstrează textul și durata totală, dar rezultatul este
-    estimativ și este marcat astfel de caller.
-    """
-    tokens = text.split()
-    duration = float(audio_duration)
-    if not tokens or duration <= 0:
-        return []
-
-    weights = [
-        max(1, len(re.sub(r"[^\w]", "", token, flags=re.UNICODE)))
-        for token in tokens
-    ]
-    total_weight = sum(weights)
-    words: list[dict[str, Any]] = []
-    elapsed_weight = 0
-    for token, weight in zip(tokens, weights):
-        start = duration * elapsed_weight / total_weight
-        elapsed_weight += weight
-        end = duration * elapsed_weight / total_weight
-        words.append({
-            "text": token,
-            "start": start,
-            "end": max(end, start + 0.01),
-            "confidence": 0.0,
-        })
-
-    captions = create_caption_segments(
-        words,
-        max_words=max_words,
-        min_duration=min_duration,
-        max_duration=max_duration,
-        remove_punctuation=remove_punctuation,
-        text_case=text_case,
-    )
-    for caption in captions:
-        caption["end"] = min(float(caption["end"]), duration)
-        caption["duration"] = caption["end"] - caption["start"]
-    return [caption for caption in captions if caption["end"] > caption["start"]]
 
 
 def safe_file_stem(text: str, fallback: str = "elevenlabs") -> str:
